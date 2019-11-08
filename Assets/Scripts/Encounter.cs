@@ -10,11 +10,17 @@ public class Encounter : MonoBehaviour {
     public ActionType actionToPerform = ActionType.LMB;
     public List<Human> actors = new List<Human>();
 
+    public bool started = false;
+
     void Start() {
         foreach (var item in actors)
         {
             item.target = this.transform;
         }
+
+        GameManager.gm.allEntities.Add(transform);
+
+        started = true;
     }
 
     void Update() {
@@ -31,12 +37,29 @@ public class Encounter : MonoBehaviour {
         return Input.GetMouseButtonDown(mouse) || Input.GetMouseButton(mouse);
     }
 
+    public void PerformAction(bool success) {
+        if (actionToPerform == ActionType.LMB) {
+            if (success) {
+                Recruit();
+            } else {
+                Kill();
+            }
+        } else if (actionToPerform == ActionType.RMB) {
+            if (success) {
+                Kill();
+            } else {
+                //TODO: Implement loss of army
+            }
+        }
+    }
+
     public void Recruit() {
         foreach (var item in actors)
         {
             item.Recruit();
             item.transform.parent = null;
         }
+        actors.Clear();
 
         Destroy(gameObject);
     }
@@ -46,5 +69,11 @@ public class Encounter : MonoBehaviour {
         {
             item.Die();
         }
+        actors.Clear();
+    }
+
+    public void OnDestroy() {
+        if (GameManager.gm != null)
+            GameManager.gm.allEntities.Remove(transform);
     }
 }

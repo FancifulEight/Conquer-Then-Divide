@@ -15,6 +15,7 @@ public class GameManager : MonoBehaviour {
     [Range(1, 8)]
     public int ticksPerBeat = 2;
     public int totalBeats;
+    public bool magicNumberTotalBeats = false;
 
     private double startDSP, tickLength, nextTickTime;
     private int tickCount = 0;
@@ -38,7 +39,8 @@ public class GameManager : MonoBehaviour {
     public Encounter[] encountersPerBeat = new Encounter[0];
 
     void OnValidate() {
-        totalBeats = (int)(beatTempo * songLengthInSeconds / 60);
+        songLengthInSeconds = (song == null) ? 0: song.length;
+        totalBeats = (magicNumberTotalBeats) ? totalBeats:(int)(beatTempo * songLengthInSeconds / 60);
         System.Array.Resize(ref encountersPerBeat, totalBeats);
     }
 
@@ -57,7 +59,7 @@ public class GameManager : MonoBehaviour {
         tickLength = 1f / (beatTempo * ticksPerBeat);
         nextTickTime = AudioSettings.dspTime + tickLength;
 
-        //ticked.AddListener(Tick);
+        ticked.AddListener(Tick);
         ticked.AddListener(BounceKing);
         
         mainSrc = GetComponent<AudioSource>();
@@ -66,30 +68,36 @@ public class GameManager : MonoBehaviour {
     }
 
     public void Tick() {
+        if (!musicPlaying) return;
+
+        int currentBeat = tickCount;// / ticksPerBeat;
         //Check if on beat, correct button is pressed
-        if (encountersPerBeat.Length <= tickCount) {
-            Debug.Log(string.Format("Current encountersPerBeat Out of Range Exception Count = {0}", tickCount));
+        if (encountersPerBeat.Length <= currentBeat) {
+            Debug.Log(string.Format("Current encountersPerBeat Out of Range Exception Count = {0}", currentBeat));
             return;
         }
-        if (encountersPerBeat[tickCount] != null) {
+        if (encountersPerBeat[currentBeat] != null) {
             //Check for hit
-            if (encountersPerBeat[tickCount].InputGetMouse()) {
+            if (encountersPerBeat[currentBeat].InputGetMouse()) {
                 //We Got A Hit!
                 ButtonHit();
+                encountersPerBeat[currentBeat].PerformAction(true);
             } else {
                 //We got a Miss...
                 ButtonMissed();
+                encountersPerBeat[currentBeat].PerformAction(false);
             }
         }
 
         //Check to spawn encounters early
-        int indexToCheck = tickCount + 2;
+        int indexToCheck = currentBeat + 2;
         if (encountersPerBeat.Length <= indexToCheck) {
-            Debug.Log(string.Format("Current encountersPerBeat Out of Range Exception Count = {0}", indexToCheck));
+            //We are near the end of the song
             return;
         }
         if (encountersPerBeat[indexToCheck] != null) {
             //Spawn it 
+            encountersPerBeat[indexToCheck] = Instantiate(encountersPerBeat[indexToCheck], new Vector2(3 * Random.Range(-2, 2), 10), Quaternion.identity);
         }
     }
 
@@ -127,11 +135,9 @@ public class GameManager : MonoBehaviour {
     }
 
     public void ReorganizeArmy() {
-        for(int i = 0;i < armySplit;i++) {
-            for (int j = i * army.Count / armySplit;j < (i + 1) * army.Count / armySplit && j < army.Count;j++) {
+        for(int i = 0;i < armySplit;i++)
+            for (int j = i * army.Count / armySplit;j < (i + 1) * army.Count / armySplit && j < army.Count;j++)
                 army[j].armyNum = i;
-            }
-        }
     }
 
     private bool startingUp = false, musicPlaying = false;
@@ -154,11 +160,12 @@ public class GameManager : MonoBehaviour {
         bool left = Input.GetMouseButtonDown(0);
         bool right = Input.GetMouseButtonDown(1);
         if ((left || right) && !musicPlaying && !startingUp) {
-            if (firstEncounter.isCorrectAction(left)) {
-                firstEncounter.Recruit();
-            } else {
-                firstEncounter.Kill();
-            }
+            if (firstEncounter != null)
+                if (firstEncounter.isCorrectAction(left)) {
+                    firstEncounter.Recruit();
+                } else {
+                    firstEncounter.Kill();
+                }
             mainSrc.loop = false;
             startingUp = true;
             tickCount = 0;
@@ -176,6 +183,9 @@ public class GameManager : MonoBehaviour {
             } else {
                 mainSrc.loop = false;
                 mainSrc.clip = beat;
+                musicPlaying = false;
+
+                readyText.text = "LMB TO\nCONTINUE";
             }
             mainSrc.Play();
 
