@@ -44,7 +44,7 @@ public class Human : MonoBehaviour{
         direction.Normalize();
 
         currentSpeed = Mathf.Lerp(currentSpeed, (stop) ? 0:speed, 0.1f);
-        anim.SetFloat("Motion", currentSpeed);
+        anim.SetFloat("Motion", currentSpeed / 2);
 
         transform.Translate(direction * currentSpeed * Time.deltaTime);
         transform.position = new Vector3(transform.position.x, transform.position.y, transform.position.y);

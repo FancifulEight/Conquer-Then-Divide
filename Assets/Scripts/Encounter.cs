@@ -69,6 +69,7 @@ public class Encounter : MonoBehaviour {
         {
             item.Die();
         }
+        //Clear so the actors can't be used again (They will be deleted along with the encounter, their parent object)
         actors.Clear();
     }
 

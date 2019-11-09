@@ -66,12 +66,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 102f4b0807203b6489fb7d568f75cd5f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  speed: 3
+  speed: 6
   dead: 0
   rend: {fileID: 7552013673455505993}
   mine: 1
   armyNum: 0
-  targetRange: 1
+  targetRange: 0.5
+  target: {fileID: 0}
 --- !u!50 &1668411693670334370
 Rigidbody2D:
   serializedVersion: 4

@@ -21,6 +21,10 @@ public class GameManager : MonoBehaviour {
     private int tickCount = 0;
     public UnityEvent ticked = new UnityEvent();
 
+    public float beatBarSpeed = 2;
+
+    public BeatBars bars;
+
     [Header("UI")]
     public Text readyText;
     public GameObject[] armyPaths = new GameObject[4];
@@ -35,8 +39,10 @@ public class GameManager : MonoBehaviour {
     public List<Human> army = new List<Human>();
     public List<Transform> allEntities = new List<Transform>();
 
+    public int spawnY = 8;
     public Encounter firstEncounter;
     public Encounter[] encountersPerBeat = new Encounter[0];
+    private Encounter[] currentRun;
 
     void OnValidate() {
         songLengthInSeconds = (song == null) ? 0: song.length;
@@ -61,6 +67,7 @@ public class GameManager : MonoBehaviour {
 
         ticked.AddListener(Tick);
         ticked.AddListener(BounceKing);
+        ticked.AddListener(bars.RestartBar);
         
         mainSrc = GetComponent<AudioSource>();
         mainSrc.clip = beat;
@@ -72,32 +79,33 @@ public class GameManager : MonoBehaviour {
 
         int currentBeat = tickCount;// / ticksPerBeat;
         //Check if on beat, correct button is pressed
-        if (encountersPerBeat.Length <= currentBeat) {
+        if (currentRun.Length <= currentBeat) {
             Debug.Log(string.Format("Current encountersPerBeat Out of Range Exception Count = {0}", currentBeat));
             return;
         }
-        if (encountersPerBeat[currentBeat] != null) {
+        //Debug.Log(currentBeat);
+        if (currentRun[currentBeat] != null && currentRun[currentBeat].started) {
             //Check for hit
-            if (encountersPerBeat[currentBeat].InputGetMouse()) {
+            if (currentRun[currentBeat].InputGetMouse()) {
                 //We Got A Hit!
                 ButtonHit();
-                encountersPerBeat[currentBeat].PerformAction(true);
+                currentRun[currentBeat].PerformAction(true);
             } else {
                 //We got a Miss...
                 ButtonMissed();
-                encountersPerBeat[currentBeat].PerformAction(false);
+                currentRun[currentBeat].PerformAction(false);
             }
         }
 
         //Check to spawn encounters early
-        int indexToCheck = currentBeat + 2;
-        if (encountersPerBeat.Length <= indexToCheck) {
+        int indexToCheck = (int)(currentBeat + spawnY / (beatBarSpeed * tickLength));
+        if (currentRun.Length <= indexToCheck) {
             //We are near the end of the song
             return;
         }
-        if (encountersPerBeat[indexToCheck] != null) {
+        if (currentRun[indexToCheck] != null) {
             //Spawn it 
-            encountersPerBeat[indexToCheck] = Instantiate(encountersPerBeat[indexToCheck], new Vector2(3 * Random.Range(-2, 2), 10), Quaternion.identity);
+            currentRun[indexToCheck] = Instantiate(encountersPerBeat[indexToCheck], new Vector2(3 * Random.Range(-2, 2), spawnY), Quaternion.identity);
         }
     }
 
@@ -168,7 +176,6 @@ public class GameManager : MonoBehaviour {
                 }
             mainSrc.loop = false;
             startingUp = true;
-            tickCount = 0;
 
             readyText.text = "READY";
 
@@ -178,6 +185,9 @@ public class GameManager : MonoBehaviour {
             if (startingUp) {
                 startingUp = false;
                 readyText.text = "";
+                
+                tickCount = 0;
+                currentRun = (Encounter[])encountersPerBeat.Clone();
 
                 StartMusic();
             } else {
@@ -202,8 +212,9 @@ public class GameManager : MonoBehaviour {
 
         //My Army
         foreach (Transform t in allEntities) {
-            t.Translate(0, -2 * Time.deltaTime, 0);
+            t.Translate(0, -beatBarSpeed * Time.deltaTime, 0);
         }
+        bars.UpdateBars(-beatBarSpeed * Time.deltaTime);
     }
 
     public void StartMusic() {
@@ -212,6 +223,10 @@ public class GameManager : MonoBehaviour {
         mainSrc.clip = song;
 
         startTime = Time.time;
+    }
+
+    public bool IsMusicPlaying() {
+        return musicPlaying;
     }
 
     public void ButtonHit() {
