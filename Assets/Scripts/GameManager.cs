@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -9,6 +10,8 @@ public class GameManager : MonoBehaviour {
     [Header("Audio")]
     public AudioSource mainSrc;
     public AudioClip beat, song;
+    public AudioSource sfxSrc;
+    public AudioClip deathSFX, poofSFX;
 
     public float songLengthInSeconds = 48;
     public float beatTempo = 120;
@@ -18,20 +21,31 @@ public class GameManager : MonoBehaviour {
     public bool magicNumberTotalBeats = false;
 
     private double startDSP, tickLength, nextTickTime;
-    private int tickCount = 0;
+    public int tickCount = 0;
     public UnityEvent ticked = new UnityEvent();
 
     public float beatBarSpeed = 2;
 
     public BeatBars bars;
+    private bool startingUp = false, musicPlaying = false;
 
     [Header("UI")]
     public Text readyText;
     public GameObject[] armyPaths = new GameObject[4];
     public King king;
 
+    public SpriteRenderer strikeZone;
+    public Text scoreText;
+    public int score = 0;
+
+    public int pointsPerKill = 110;
+    public int pointsPerRecruit = 100;
+
     [Header("Gameplay")]
     public Color armyColour = Color.blue;
+    public Color enemyColour = Color.red;
+    public Color neutralColour = Color.white;
+
     private float startTime = 0;
     public Vector2[] armyGoals = new Vector2[4];
     public int armySplit = 1;
@@ -43,6 +57,9 @@ public class GameManager : MonoBehaviour {
     public Encounter firstEncounter;
     public Encounter[] encountersPerBeat = new Encounter[0];
     private Encounter[] currentRun;
+
+    private double lastLMB = 0, lastRMB = 0;
+    public bool armyChanged = false;
 
     void OnValidate() {
         songLengthInSeconds = (song == null) ? 0: song.length;
@@ -86,14 +103,14 @@ public class GameManager : MonoBehaviour {
         //Debug.Log(currentBeat);
         if (currentRun[currentBeat] != null && currentRun[currentBeat].started) {
             //Check for hit
-            if (currentRun[currentBeat].InputGetMouse()) {
+            if (ClickedOnBeat(true)) {
                 //We Got A Hit!
                 ButtonHit();
-                currentRun[currentBeat].PerformAction(true);
+                //currentRun[currentBeat].PerformAction(true);
             } else {
                 //We got a Miss...
                 ButtonMissed();
-                currentRun[currentBeat].PerformAction(false);
+                //currentRun[currentBeat].PerformAction(false);
             }
         }
 
@@ -105,7 +122,7 @@ public class GameManager : MonoBehaviour {
         }
         if (currentRun[indexToCheck] != null) {
             //Spawn it 
-            currentRun[indexToCheck] = Instantiate(encountersPerBeat[indexToCheck], new Vector2(3 * Random.Range(-2, 2), spawnY), Quaternion.identity);
+            currentRun[indexToCheck] = Instantiate(encountersPerBeat[indexToCheck], new Vector2(0, spawnY), Quaternion.identity);
         }
     }
 
@@ -123,34 +140,36 @@ public class GameManager : MonoBehaviour {
     }
 
     public void Conquer() {
-        if (armySplit == 1) return;
-        armySplit = 1;
-
-        for (int i = 0;i < armyPaths.Length;i++) {
-            armyPaths[i].SetActive(i == armySplit - 1);
-        }
-
-        ReorganizeArmy();
+        armyChanged = true;
     }
 
     public void Divide() {
-        if (armySplit == armyGoals.Length) return;
-        armySplit++;
+        armySplit = (armySplit + 1) % (armyGoals.Length + 1);
+        if (armySplit == 0) armySplit++;
 
-        armyPaths[armySplit - 1].SetActive(true);
+        for (int i = 0;i < armyPaths.Length;i++) {
+            armyPaths[i].SetActive(i <= armySplit - 1);
+        }
         
-        ReorganizeArmy();
+        armyChanged = true;
     }
 
-    public void ReorganizeArmy() {
-        for(int i = 0;i < armySplit;i++)
-            for (int j = i * army.Count / armySplit;j < (i + 1) * army.Count / armySplit && j < army.Count;j++)
-                army[j].armyNum = i;
+    public void ReorganizeArmy(List<Human> list, int divisions) {
+        for(int i = 0;i < divisions;i++)
+            for (int j = i * list.Count / divisions;j < (i + 1) * list.Count / divisions && j < list.Count;j++)
+                list[j].armyNum = i;
     }
 
-    private bool startingUp = false, musicPlaying = false;
     // Update is called once per frame
     void Update() {
+        if (Input.GetButtonDown("Cancel")) {
+            #if UNITY_EDITOR
+                UnityEditor.EditorApplication.isPlaying = false;
+            #else
+                Application.Quit();
+            #endif
+        }
+
         //King Semaphore
         king.ChangeFlags(Input.GetMouseButton(0), Input.GetMouseButton(1));
 
@@ -167,18 +186,23 @@ public class GameManager : MonoBehaviour {
 
         bool left = Input.GetMouseButtonDown(0);
         bool right = Input.GetMouseButtonDown(1);
-        if ((left || right) && !musicPlaying && !startingUp) {
+        if (left)
+            lastLMB = AudioSettings.dspTime;
+        if (right)
+            lastRMB = AudioSettings.dspTime;
+
+        strikeZone.color = new Color(
+            strikeZone.color.r, strikeZone.color.g, strikeZone.color.b, 
+            Mathf.Lerp(strikeZone.color.a, 
+                (ClickedOnBeat(true) || ClickedOnBeat(false)) ? 0.9f:0.1f, 0.6f));
+
+        if (left && !musicPlaying && !startingUp) {
             if (firstEncounter != null)
-                if (firstEncounter.isCorrectAction(left)) {
-                    firstEncounter.Recruit();
-                } else {
-                    firstEncounter.Kill();
-                }
+                firstEncounter.Recruit();
             mainSrc.loop = false;
             startingUp = true;
 
             readyText.text = "READY";
-
         }
 
         if (!mainSrc.isPlaying) {
@@ -201,6 +225,11 @@ public class GameManager : MonoBehaviour {
 
         } else if (musicPlaying) {
             UpdateInGame();
+        }
+
+        if (armyChanged) {        
+            ReorganizeArmy(army, armySplit);
+            armyChanged = false;
         }
     }
 
@@ -235,5 +264,38 @@ public class GameManager : MonoBehaviour {
 
     public void ButtonMissed() {
         Debug.Log("Missed Note");
+    }
+
+    public bool ClickedOnBeat(bool left) {
+        return AudioSettings.dspTime - tickLength <= ((left) ? lastLMB:lastRMB);
+    }
+
+    public void UpdateScore(int pointsToAdd) {
+        score += pointsToAdd;
+
+        score = Math.Min(999999, score);
+
+        int temp = score;
+        int count = 6;
+        while (temp > 0) {
+            temp /= 10;
+            count--;
+        }
+
+        string output = "Score: ";
+        for (int i = 0;i < count;i++) {
+            output += "0";
+        }
+
+        output += score;
+        scoreText.text = output;
+    }
+
+    public void PlayDeathSFX() {
+        sfxSrc.PlayOneShot(deathSFX, 0.2f + UnityEngine.Random.Range(0f, 0.4f));
+    }
+
+    public void PlayPoofSFX() {
+        sfxSrc.PlayOneShot(poofSFX, 0.6f + UnityEngine.Random.Range(0f, 0.4f));
     }
 }

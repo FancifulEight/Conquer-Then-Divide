@@ -10,7 +10,7 @@ PrefabInstance:
     - target: {fileID: 1668411693670334382, guid: 0d9a462faa99b9645a71f901f83b3322,
         type: 3}
       propertyPath: m_Name
-      value: Enemy Human
+      value: Enemy Human Variant
       objectReference: {fileID: 0}
     - target: {fileID: 1668411693670334381, guid: 0d9a462faa99b9645a71f901f83b3322,
         type: 3}
@@ -66,6 +66,16 @@ PrefabInstance:
         type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1668411693670334371, guid: 0d9a462faa99b9645a71f901f83b3322,
+        type: 3}
+      propertyPath: mine
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1668411693670334371, guid: 0d9a462faa99b9645a71f901f83b3322,
+        type: 3}
+      propertyPath: enemy
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7552013673455505993, guid: 0d9a462faa99b9645a71f901f83b3322,
         type: 3}
